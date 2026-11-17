@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/logo.png" width="96" alt="Upbar Logo" />
+
 # Upbar
 
 **A fast, zero-dependency desktop top bar, quick settings control center, and widget suite for Windows 10 & 11.**  
@@ -11,7 +13,9 @@ Built with the in-box Windows C# compiler (~430 KB executable, 0 external packag
 
 </div>
 
-![Upbar Top Bar](assets/topbar.png)
+![Upbar Desktop Overview](assets/fullscreen.png)
+
+![Upbar Top Bar Close-up](assets/topbar.png)
 
 ---
 
