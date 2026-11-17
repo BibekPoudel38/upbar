@@ -1,0 +1,21 @@
+# User data & local state (never committed)
+notes/
+icons/
+cursors/*.cur
+cursors/backup.txt
+topbar.ini
+topbar.ini.before-restore
+apps.txt
+shelf.txt
+clippins.txt
+topbar.log
+
+# Build & update artifacts
+Upbar.exe
+Upbar.exe.old
+Upbar.exe.new
+*.pdb
+
+# Scratch preview duplicates (kept in assets/)
+squircle-sample.png
+workspace-dots-preview.png

@@ -1,0 +1,45 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Upbar.exe
+        shell: cmd
+        run: call build.bat
+
+      - name: Run self-tests
+        shell: pwsh
+        run: |
+          ./Upbar.exe --selftest
+          if ($LASTEXITCODE -ne 0) { throw "Self-test failed with exit code $LASTEXITCODE" }
+
+      - name: Package release bundle
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/fonts, dist/weather | Out-Null
+          Copy-Item Upbar.exe, upbar.ico, build.bat, README.md, LICENSE dist/
+          Copy-Item fonts/* dist/fonts/
+          Copy-Item weather/* dist/weather/
+          Compress-Archive -Path dist/* -DestinationPath Upbar-win64.zip -Force
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            Upbar.exe
+            Upbar-win64.zip
+          generate_release_notes: true
