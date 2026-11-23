@@ -23,8 +23,10 @@ jobs:
       - name: Run self-tests
         shell: pwsh
         run: |
-          ./Upbar.exe --selftest
-          if ($LASTEXITCODE -ne 0) { throw "Self-test failed with exit code $LASTEXITCODE" }
+          # Upbar.exe is a GUI app: PowerShell wouldn't wait for it or set $LASTEXITCODE, so wait explicitly
+          $p = Start-Process ./Upbar.exe -ArgumentList --selftest -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Self-test failed: $($p.ExitCode) failing check(s)" }
+          Write-Host "Self-tests passed"
 
       - name: Package release bundle
         shell: pwsh
