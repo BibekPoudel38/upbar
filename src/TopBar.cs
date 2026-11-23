@@ -53,6 +53,9 @@ class TopBar : Form
     [DllImport("user32.dll")] static extern bool RegisterHotKey(IntPtr h, int id, uint mods, uint vk);
     [DllImport("user32.dll")] static extern bool UnregisterHotKey(IntPtr h, int id);
     string hintKey;                        // the suggestion on show (null: none)
+    string tileText, tileSub;              // what the hover tile under the chip says
+    Glass tile;
+    readonly Timer tileWatch = new Timer { Interval = 120 }; // runs only while the tile is down: lifts it once the pointer leaves chip and tile
     Sys.Note note;                         // a notification that just arrived, shown in the chip for a few seconds
     string link;                           // a web link just copied: the chip offers to open it
     bool loudShown;                        // the sound meter's "loud" alert is on show
@@ -185,7 +188,7 @@ class TopBar : Form
         Privacy.Start();
         Clip.Changed += () => Ui(RefreshStatus);
         maxCheck.Interval = 150; // window events come in bursts; check maximized state once they settle
-        maxCheck.Tick += (s, e) => { maxCheck.Stop(); var top = Native.TopMaximizedOnPrimary(Handle); bool m = top != IntPtr.Zero; if (m != maxPresent) { maxPresent = m; ApplyShape(); } if (top != maxWin) { maxWin = top; RefreshStatus(); } SampleApp(); };
+        maxCheck.Tick += (s, e) => { maxCheck.Stop(); FullscreenCheck(); var top = Native.TopMaximizedOnPrimary(Handle); bool m = top != IntPtr.Zero; if (m != maxPresent) { maxPresent = m; ApplyShape(); } if (top != maxWin) { maxWin = top; RefreshStatus(); } SampleApp(); };
         resample.Tick += (s, e) => SampleApp(); // the app may change colour (a new tab, dark mode) without any window event
         clipRetry.Interval = 120; // another app still holds the clipboard open
         clipRetry.Tick += (s, e) => { clipRetry.Stop(); Clip.Capture(); };
@@ -407,6 +410,7 @@ class TopBar : Form
         hint.Icons.Clear();
         hint.Colors.Clear();
         hint.Pos = hintKey == null ? 3 : Cfg.StatusPos;
+        tileText = tileSub = null;
         if (hintKey != null)
         {
             Color c = hintKey == "loud" || hintKey == "rec" ? LowBattery(5, false, false) : hintKey == "hplow" || hintKey == "disk" ? LowBattery(25, false, false) : hintKey == "full" ? Theme.BarGreen : hintKey == "charge" ? LowBattery(BatteryPct, false, false) : Color.White;
@@ -421,6 +425,15 @@ class TopBar : Form
                       : hintKey == "download" ? "Downloading " + dl : hintKey == "done" ? "Downloaded " + Short(Path.GetFileName(doneFile)) + " · Show"
                       : hintKey == "link" ? "Open link · " + LinkHost(link) : hintKey == "note" ? title : hintKey == "charge" ? "Connect charger" : hintKey == "full" ? "Fully charged, you can unplug" : hintKey == "muted" ? "Sound is muted" : "No internet";
             hint.TextColor = c;
+            // The tile that drops down while the chip is hovered: the uncut text, then the note's body or what a click does.
+            string full = hintKey == "note" ? note.Title : hintKey == "link" ? "Link · " + link : hintKey == "done" ? "Downloaded " + Path.GetFileName(doneFile)
+                        : hintKey == "download" ? "Downloading " + Downloads.Name(Downloads.Active) + " · " + (Downloads.Size(Downloads.Active) / 1048576.0).ToString("0.#") + " MB" : hintKey == "disk" ? lowDisk : hint.Text;
+            string act = hintKey == "note" || hintKey == "link" ? "Open" : hintKey == "done" ? "Show in folder" : hintKey == "download" ? "Show folder" : hintKey == "rec" || hintKey == "full" ? "Click to hide"
+                       : hintKey == "hp" || hintKey == "hplow" ? "Bluetooth settings" : hintKey == "update" ? "Open Windows Update" : hintKey == "disk" ? "Open storage settings"
+                       : hintKey == "meeting" ? (meeting.Link != null ? "Join" : "Open calendar") : hintKey == "loud" ? "Sound meter" : hintKey == "clock" ? "Open Clock"
+                       : hintKey == "charge" ? "Battery settings" : hintKey == "muted" ? "Click to unmute" : hintKey == "offline" ? "Wi-Fi settings" : null;
+            tileText = Cut(full, 80);
+            tileSub = hintKey == "note" && !string.IsNullOrEmpty(note.Body) ? Cut(note.Body, 80) : act;
         }
 
         bool tick = hintKey == "clock" && due.Timer || hintKey == "download" || now < doneUntil; // a live countdown, a growing download, or a "done" to expire
@@ -1047,6 +1060,91 @@ class TopBar : Form
         }
     }
 
+    // Hovering the suggestion chip drops a tile below it with the whole story; click it to act, as with the chip.
+    // Hovering some pills drops a tile below them (no focus taken): the chip's whole story, the song with its
+    // controls, device batteries, or the windows on a desktop. Built once per hover; rebuilt when its key changes.
+    Btn tileOwner, tileHeld; // tileHeld: its popup was just clicked shut; no tile until the pointer leaves it
+    string tileKey;
+    void HoverTile(Btn h, int x)
+    {
+        if (h != tileHeld) tileHeld = null;
+        if (h == null || popup != null || h == tileHeld) return;
+        if (h == hint && hintKey != null && tileText != null)
+            ShowTile(h, "hint|" + tileText, h.R, t => t.Item(hint.Icons.Count > 0 ? hint.Icons[0] : "", tileText, tileSub, () => { if (hint.Click != null) hint.Click(); }));
+        else if (h == media && Media.Has)
+            ShowTile(h, "media", h.R, () => new MediaPopup(S)); // the same panel a click opens
+        else if (h == devices && Peripherals.Count > 0)
+            ShowTile(h, "dev", h.R, t => { foreach (var d in Peripherals) { var dev = d; t.Item(d.Icon, d.Name, d.Sub, () => dev.Open()); } });
+        else if (h == spaces)
+        {
+            int i = Math.Max(0, Math.Min(Desktops.Count - 1, (int)((x - h.R.X - 10 * S) / (14 * S)))); // same maths as the click
+            var dot = new RectangleF(h.R.X + 10 * S + i * 14 * S - 6 * S, h.R.Y, 26 * S, h.R.Height);
+            ShowTile(h, "space" + i, dot, t =>
+            {
+                var wins = Desktops.Windows(i);
+                foreach (var w in wins) { var hw = w.Key; int to = i; t.Item("", Cut(w.Value, 50), () => Desktops.Show(to, hw)); } // E737: window
+                if (wins.Count == 0) t.Item("", "No windows", () => Desktops.Go(i));
+            }, "Desktop " + (i + 1) + (i == Desktops.Current ? " · current" : ""));
+        }
+    }
+
+    void ShowTile(Btn owner, string key, RectangleF anchor, Action<HintTile> fill, string title = null)
+    {
+        ShowTile(owner, key, anchor, () => { var t = new HintTile(S, title); fill(t); return t.LayoutMenu(); });
+    }
+
+    void ShowTile(Btn owner, string key, RectangleF anchor, Func<Glass> make)
+    {
+        if (tile != null && tile.Visible && tileKey == key) return;
+        CloseTile();
+        tile = make();
+        if (tile.IsDisposed) { tile = null; return; } // e.g. the media panel closes itself when the music has gone
+        tileOwner = owner;
+        tileKey = key;
+        tile.ShowQuiet(new Rectangle(PointToScreen(new Point((int)anchor.X, 0)), new Size((int)anchor.Width, barH + (int)(6 * S))));
+        if (tileWatch.Tag == null) { tileWatch.Tag = true; tileWatch.Tick += (s, e) => TileCheck(); }
+        tileWatch.Start();
+    }
+
+    void CloseTile()
+    {
+        tileWatch.Stop();
+        if (tile != null && !tile.IsDisposed) tile.Close();
+        tile = null;
+        tileKey = null;
+    }
+
+    void TileCheck()
+    {
+        if (tile == null || tile.IsDisposed || !tile.Visible) { tileWatch.Stop(); return; }
+        var p = Cursor.Position;
+        var chip = RectangleToScreen(Rectangle.Round(tileOwner.R));
+        chip.Height = barH + (int)(8 * S); // the gap down to the tile counts as the pill
+        if (tileOwner.Pos < 3 && popup == null && (chip.Contains(p) || tile.Bounds.Contains(p))) return;
+        CloseTile();
+    }
+
+    // A full-screen window on the primary screen hides the bar (and anything hanging from it); it returns on exit.
+    bool hiddenForFullscreen;
+    void FullscreenCheck()
+    {
+        bool fs = Native.FullscreenOnPrimary(Handle);
+        if (fs == hiddenForFullscreen) return;
+        hiddenForFullscreen = fs;
+        if (fs)
+        {
+            CloseTile();
+            if (popup != null) popup.Dismiss();
+            Visible = false;
+        }
+        else
+        {
+            Visible = true; // NOACTIVATE: comes back without taking focus
+            TopMost = true;
+            DockBar();
+        }
+    }
+
     Btn Hit(Point pt)
     {
         foreach (var b in btns) if (b.Pos < 3 && b.R.Contains(pt)) return b;
@@ -1056,12 +1154,13 @@ class TopBar : Form
     protected override void OnMouseMove(MouseEventArgs e)
     {
         var h = Hit(e.Location);
+        HoverTile(h, e.X); // before the early return: moving between workspace dots changes the tile
         if (h == hover) return;
         hover = h;
         KickBar();
         tips.Hide(this);
         tipWait.Stop();
-        if (h != null && h.Tip != null && popup == null) tipWait.Start();
+        if (h != null && h.Tip != null && popup == null && (tile == null || tileOwner != h)) tipWait.Start(); // the tile says more than the tooltip
     }
     protected override void OnMouseLeave(EventArgs e) { hover = null; pressedBtn = null; KickBar(); tipWait.Stop(); tips.Hide(this); }
     protected override void OnMouseDown(MouseEventArgs e)
@@ -1089,9 +1188,12 @@ class TopBar : Form
     // One popup at a time; clicking its own pill again closes it.
     void TogglePopup(Btn owner, Func<Glass> make)
     {
-        if (popup != null) { bool same = popupOwner == owner; var was = popup; was.Dismiss(); if (popup == was) { popup = null; popupClosed = DateTime.Now; } if (same) return; }
+        Glass keep = null; // a click on a pill whose own panel is already hovered open keeps that panel
+        if (popup == null && tile != null && tile.Visible && tileOwner == owner && !(tile is HintTile)) { keep = tile; tile = null; tileKey = null; tileWatch.Stop(); }
+        CloseTile(); // the popup takes over from the hover tile
+        if (popup != null) { bool same = popupOwner == owner; var was = popup; was.Dismiss(); if (popup == was) { popup = null; popupClosed = DateTime.Now; } if (same) { tileHeld = owner; return; } }
         else if (popupOwner == owner && (DateTime.Now - popupClosed).TotalMilliseconds < 300) return; // that click is what closed it
-        var p = make();
+        var p = keep ?? make();
         if (p.IsDisposed) return;
         popup = p;
         popupOwner = owner;
@@ -1102,6 +1204,7 @@ class TopBar : Form
         }
         Invalidate();
         var r = owner.R;
+        if (keep != null) { keep.Promote(); return; } // already in place
         p.ShowAt(new Rectangle(PointToScreen(new Point((int)r.X, 0)), new Size((int)r.Width, barH + (int)(6 * S))));
     }
 
@@ -1435,7 +1538,7 @@ class TopBar : Form
         if (m.Msg == cbMsg)
         {
             if ((int)m.WParam == 1) DockBar();                        // ABN_POSCHANGED
-            if ((int)m.WParam == 2) TopMost = m.LParam == IntPtr.Zero; // ABN_FULLSCREENAPP: get out of the way
+            if ((int)m.WParam == 2) { TopMost = m.LParam == IntPtr.Zero; FullscreenCheck(); } // ABN_FULLSCREENAPP: get out of the way
         }
         if (m.Msg == 0x7E) DockBar();                                              // WM_DISPLAYCHANGE
         if (m.Msg == 0x218 && (int)m.WParam == 0xA) RefreshStatus();               // WM_POWERBROADCAST / power status change
@@ -1602,6 +1705,7 @@ static class SelfTest
         if (Native.DeviceKey(@"\\?\HID#VID_046D&PID_C52B&MI_01&Col02#7&1&0&0001#{guid}") != "VID_046D&PID_C52B"
             || Native.DeviceKey(@"\\?\HID#{00001124-0000-1000-8000-00805f9b34fb}_VID&0002046d_PID&b023&Col01#8&2") != "VID&0002046D_PID&B023"
             || Native.DeviceKey(@"\\?\ACPI#MSF0001#4&1d401fb5&0#{guid}") != null) fails++;
+        if (!(Native.Covers(new Rectangle(0, 0, 2560, 1600), new Rectangle(0, 0, 2560, 1600)) && !Native.Covers(new Rectangle(-11, 34, 2582, 1577), new Rectangle(0, 0, 2560, 1600)))) fails++; // full screen vs maximized under the bar
         if (!(G.Battery(100, false) == "" && G.Battery(45, true) == "" && G.Battery(95, true) == "" && G.Volume(0.5f, false) == "")) fails++;
         if (!(Sys.BtKind("ProtoArc EM11 Pro", null, 15, 2) == "Mouse" && Sys.BtKind("Keychron K2", null, 15, 1) == "Keyboard" && Sys.BtKind("Rockerz", "AudioVideo", 0, 0) == "AudioVideo")) fails++;
         if (!(Updater.IsNewer("v1.1.0", "1.0.0") && Updater.IsNewer("2.0.0", "1.9.9") && !Updater.IsNewer("v1.0.0", "1.0.0") && !Updater.IsNewer("v0.9.0", "1.0.0"))) fails++;

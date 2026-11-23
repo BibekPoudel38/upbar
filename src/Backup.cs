@@ -60,7 +60,7 @@ static class Backup
 // Self-updater backed by GitHub Releases (https://github.com/BibekPoudel38/upbar/releases/latest).
 static class Updater
 {
-    public const string Version = "1.0.0";
+    public const string Version = "1.1.0";
     public const string Repo = "BibekPoudel38/upbar";
     public static string Status = "Check for updates (v" + Version + ")";
     public static string LatestTag, DownloadUrl, ReleaseUrl;

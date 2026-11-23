@@ -178,6 +178,37 @@ static class Native
         return Rectangle.FromLTRB(win.Left, top, win.Right, bottom);
     }
 
+    // Is the top app window on the primary monitor full screen (a video, a game, a browser on F11)? It covers the whole
+    // screen, the bar's strip included, which a maximized window never does. Judged by z-order, not focus: a video can
+    // stay full screen on this screen while you work on another one. Tool windows (overlays, our widgets) don't count.
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, System.Text.StringBuilder sb, int max);
+    public static bool FullscreenOnPrimary(IntPtr self)
+    {
+        IntPtr primary = MonitorFromPoint(new POINT(), 1);
+        uint me = (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
+        var screen = System.Windows.Forms.Screen.PrimaryScreen.Bounds;
+        var cls = new System.Text.StringBuilder(64);
+        bool full = false;
+        EnumWindows((h, l) =>
+        {
+            if (h == self || !IsWindowVisible(h) || (GetWindowLong(h, -20) & 0x80) != 0 || MonitorFromWindow(h, 2) != primary) return true;
+            int cloaked;
+            if (DwmGetWindowAttribute(h, 14, out cloaked, 4) == 0 && cloaked != 0) return true; // other desktop / suspended app
+            uint pid;
+            GetWindowThreadProcessId(h, out pid);
+            if (pid == me) return true; // our own popups
+            cls.Length = 0;
+            GetClassName(h, cls, cls.Capacity);
+            string c = cls.ToString();
+            if (c == "Progman" || c == "WorkerW" || c == "Shell_TrayWnd") return false; // reached the desktop: nothing full screen
+            RECT r;
+            full = GetWindowRect(h, out r) && Covers(Rectangle.FromLTRB(r.l, r.t, r.r, r.b), screen);
+            return false; // only the top app window decides
+        }, IntPtr.Zero);
+        return full;
+    }
+    public static bool Covers(Rectangle win, Rectangle screen) { return win.Left <= screen.Left && win.Top <= screen.Top && win.Right >= screen.Right && win.Bottom >= screen.Bottom; }
+
     public static bool AnyMaximizedOnPrimary(IntPtr self) { return TopMaximizedOnPrimary(self) != IntPtr.Zero; }
 
     // The front-most maximized window on the primary screen (windows are listed front to back), or Zero.
@@ -458,8 +489,8 @@ static class G
 
     public static string Volume(float v, bool mute)
     {
-        if (mute) return Mute;
-        return ((char)(v < 0.01f ? 0xE992 : v < 0.34f ? 0xE993 : v < 0.67f ? 0xE994 : 0xE995)).ToString(); // Volume0-3
+        if (mute || v < 0.01f) return Mute; // like Windows: 0% shows the crossed-out speaker
+        return ((char)(v < 0.34f ? 0xE993 : v < 0.67f ? 0xE994 : 0xE995)).ToString(); // Volume1-3
     }
 
     // Battery0-9 = E850-E859, Battery10 = E83F; Charging0-8 = E85A-E862, Charging9 = E83E

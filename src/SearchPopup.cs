@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Reflection;
+using System.Threading;
 using System.Text.RegularExpressions;
 
 // Search box under the centre pill: Enter opens the chosen engine or AI chat in the default browser.
@@ -76,13 +78,25 @@ class SearchPopup : Glass
         string conv = Convert(q);
         if (conv != null) rows.Add(new MenuRow { Icon = "\uE8EF", Text = conv, Sub = "Enter copies it", Compact = true, Click = () => Copy(conv.Substring(conv.IndexOf('=') + 1).Trim()) });
         if (q.Length >= 2)
-            foreach (var app in Match(q, 4))
+        {
+            foreach (var app in Match(apps, q, 4))
             {
                 var path = app.Value;
                 var row = new MenuRow { Icon = "\uE8E1", Img = AppIcon(path), Text = app.Key, Sub = "Open app", Compact = true, Click = () => { Close(); Shell.Open(path); } };
                 rows.Add(row);
-                admin[row] = path;
+                if (!path.StartsWith(Store, StringComparison.OrdinalIgnoreCase)) admin[row] = path; // Store apps can't be run as administrator
             }
+            foreach (var p in Match(Pages, q, 2))
+            {
+                var uri = p.Value;
+                rows.Add(new MenuRow { Icon = G.Settings, Text = p.Key, Sub = "Settings", Compact = true, Click = () => { Close(); Shell.Open(uri); } });
+            }
+            foreach (var f in Files(q))
+            {
+                var path = f;
+                rows.Add(new MenuRow { Icon = G.File, Img = AppIcon(path), Text = Path.GetFileName(path), Sub = Path.GetDirectoryName(path), Compact = true, Click = () => { Close(); Shell.Open(path); } });
+            }
+        }
         if (rows.Count > 0) top = rows[0].Click;
         if (q.Length > 0) rows.Add(new MenuRow { Icon = G.Search, Text = "Search " + Names[cfg.SearchEngine] + " for \u201c" + (q.Length > 40 ? q.Substring(0, 39) + "…" : q) + "\u201d", Compact = true, Click = () => { Close(); Shell.Open(Url(cfg, q)); } });
         float pad = 6 * S, h = 44 * S, y = pad + h + 4 * S, rh = 44 * S;
@@ -187,14 +201,99 @@ class SearchPopup : Glass
             }
             catch (Exception) { } // a folder we can't read
         }
+        // Store apps (Settings, Calculator, Photos…) have no shortcut: they are only in shell:AppsFolder, keyed by app id.
+        try
+        {
+            var t = Type.GetTypeFromProgID("Shell.Application");
+            object sh = Activator.CreateInstance(t);
+            object folder = t.InvokeMember("NameSpace", BindingFlags.InvokeMethod, null, sh, new object[] { "shell:AppsFolder" });
+            object items = folder.GetType().InvokeMember("Items", BindingFlags.InvokeMethod, null, folder, null);
+            foreach (object it in (System.Collections.IEnumerable)items)
+            {
+                string n = (string)it.GetType().InvokeMember("Name", BindingFlags.GetProperty, null, it, null);
+                string id = (string)it.GetType().InvokeMember("Path", BindingFlags.GetProperty, null, it, null);
+                if (id != null && id.Contains("!") && n != null && seen.Add(n)) list.Add(new KeyValuePair<string, string>(n, Store + id)); // "!" marks a packaged app id
+            }
+        }
+        catch (Exception) { } // shell not available: classic apps still work
         apps = list;
         appsAt = DateTime.Now;
     }
 
-    // Names starting with the query first, then names with a word starting with it.
-    public static List<KeyValuePair<string, string>> Match(string q, int max)
+    const string Store = "shell:AppsFolder\\";
+
+    // Settings pages by name -> ms-settings: link.
+    static readonly List<KeyValuePair<string, string>> Pages = new List<KeyValuePair<string, string>>();
+    static SearchPopup()
     {
-        var a = apps;
+        string[] p = {
+            "Bluetooth & devices", "bluetooth", "Display", "display", "Sound", "sound", "Wi-Fi", "network-wifi", "Network & internet", "network",
+            "VPN", "network-vpn", "Mobile hotspot", "network-mobilehotspot", "Battery", "batterysaver", "Power & sleep", "powersleep",
+            "Background", "personalization-background", "Colors", "colors", "Themes", "themes", "Lock screen", "lockscreen", "Taskbar", "taskbar",
+            "Night light", "nightlight", "Notifications", "notifications", "Focus", "focus", "Multitasking", "multitasking", "Clipboard", "clipboard",
+            "Storage", "storagesense", "About this PC", "about", "Installed apps", "appsfeatures", "Default apps", "defaultapps", "Startup apps", "startupapps",
+            "Mouse", "mousetouchpad", "Touchpad", "devices-touchpad", "Keyboard", "keyboard", "Printers & scanners", "printers",
+            "Your account", "yourinfo", "Sign-in options", "signinoptions", "Date & time", "dateandtime", "Language & region", "regionlanguage",
+            "Privacy & security", "privacy", "Camera privacy", "privacy-webcam", "Microphone privacy", "privacy-microphone", "Location", "privacy-location",
+            "Windows Update", "windowsupdate", "Accessibility", "easeofaccess", "Gaming", "gaming-gamebar", "Projecting to this PC", "project" };
+        for (int i = 0; i < p.Length; i += 2) Pages.Add(new KeyValuePair<string, string>(p[i], "ms-settings:" + p[i + 1]));
+    }
+
+    // Files and folders by name from the Windows Search index (already built by Windows, so no disk walk).
+    // Runs off the UI thread on one kept-open connection; a query superseded by newer typing is skipped.
+    static readonly object dbLock = new object();
+    static System.Data.OleDb.OleDbConnection db;
+    static int fileSeq;
+    string filesQ;
+    List<string> files = new List<string>();
+    List<string> Files(string q)
+    {
+        if (q == filesQ) return files;
+        if (q.Length < 2) { filesQ = q; return files = new List<string>(); }
+        int seq = Interlocked.Increment(ref fileSeq);
+        ThreadPool.QueueUserWorkItem(_ =>
+        {
+            List<string> found;
+            lock (dbLock)
+            {
+                if (seq != fileSeq) return; // the user kept typing
+                found = QueryIndex(q, 4);
+            }
+            try { BeginInvoke((Action)(() => { if (IsDisposed || seq != fileSeq) return; filesQ = q; files = found; Results(); })); }
+            catch (InvalidOperationException) { } // popup closed meanwhile
+        });
+        return files; // previous results stay up until the new ones land: no flicker
+    }
+
+    static List<string> QueryIndex(string q, int max)
+    {
+        var outp = new List<string>();
+        string term = Regex.Replace(q, "[\"'*%\\[\\]]", " ").Trim(); // the index's own query language: keep only plain words
+        if (term.Length == 0) return outp;
+        try
+        {
+            if (db == null) { db = new System.Data.OleDb.OleDbConnection("Provider=Search.CollatorDSO;Extended Properties='Application=Windows';"); db.Open(); }
+            var words = new List<string>();
+            foreach (var w in term.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)) if (w.Length >= 2) words.Add("CONTAINS(System.FileName, '\"" + w + "*\"')"); // 1-letter prefixes match nothing
+            if (words.Count == 0) return outp;
+            // Personal folders only, newest first: SCOPE uses the index (~100 ms); LIKE-on-path filters scan it (1-2 s).
+            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile).Replace('\\', '/').Replace("'", "''"), scope = "";
+            foreach (var f in new[] { "Desktop", "Documents", "Downloads", "Pictures", "Videos", "Music", "OneDrive" }) scope += (scope.Length > 0 ? " OR " : "") + "SCOPE='file:" + home + "/" + f + "'";
+            using (var cmd = new System.Data.OleDb.OleDbCommand("SELECT TOP " + (max * 4) + " System.ItemPathDisplay FROM SYSTEMINDEX WHERE (" + scope + ") AND " + string.Join(" AND ", words) + " ORDER BY System.DateModified DESC", db))
+            using (var r = cmd.ExecuteReader())
+                while (r.Read() && outp.Count < max)
+                {
+                    string p = r.IsDBNull(0) ? null : r.GetString(0);
+                    if (p != null && p.IndexOf("\\node_modules\\", StringComparison.OrdinalIgnoreCase) < 0 && p.IndexOf("\\.git\\", StringComparison.OrdinalIgnoreCase) < 0) outp.Add(p); // project internals
+                }
+        }
+        catch (Exception) { if (db != null) { db.Dispose(); db = null; } } // search service off or restarting: reconnect next time
+        return outp;
+    }
+
+    // Names starting with the query first, then names with a word starting with it.
+    public static List<KeyValuePair<string, string>> Match(List<KeyValuePair<string, string>> a, string q, int max)
+    {
         var outp = new List<KeyValuePair<string, string>>();
         foreach (var p in a) if (p.Key.StartsWith(q, StringComparison.OrdinalIgnoreCase) && outp.Count < max) outp.Add(p);
         foreach (var p in a) if (outp.Count < max && !outp.Contains(p) && p.Key.IndexOf(" " + q, StringComparison.OrdinalIgnoreCase) >= 0) outp.Add(p);

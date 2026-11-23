@@ -766,6 +766,7 @@ static class Desktops
     [DllImport("advapi32.dll")] static extern int RegNotifyChangeKeyValue(Microsoft.Win32.SafeHandles.SafeRegistryHandle key, bool subtree, int filter, Microsoft.Win32.SafeHandles.SafeWaitHandle ev, bool async);
     const string KeyPath = @"Software\Microsoft\Windows\CurrentVersion\Explorer\VirtualDesktops";
     public static int Count = 1, Current;
+    static byte[] Ids; // 16 bytes per desktop, in order
     public static event Action Changed; // worker thread
     static Microsoft.Win32.RegistryKey key;
     static readonly AutoResetEvent signal = new AutoResetEvent(false);
@@ -792,6 +793,7 @@ static class Desktops
             var ids = k == null ? null : k.GetValue("VirtualDesktopIDs") as byte[];
             var cur = k == null ? null : k.GetValue("CurrentVirtualDesktop") as byte[];
             Count = ids == null ? 1 : Math.Max(1, ids.Length / 16);
+            Ids = ids;
             Current = Index(ids, cur);
         }
     }
@@ -807,6 +809,52 @@ static class Desktops
         }
         return 0;
     }
+
+    // The app windows on desktop i (title -> handle), front to back. Windows on other desktops are shell-cloaked,
+    // so visibility alone can't tell; the documented IVirtualDesktopManager says which desktop each one is on.
+    [ComImport, Guid("a5cd92ff-29be-454c-8d04-d82879fb3f1b"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IVirtualDesktopManager
+    {
+        [PreserveSig] int IsWindowOnCurrentVirtualDesktop(IntPtr h, out int on);
+        [PreserveSig] int GetWindowDesktopId(IntPtr h, out Guid id);
+    }
+    [ComImport, Guid("aa509086-5ca9-4c25-8f95-589d3c07b48a")] class VirtualDesktopManager { }
+    delegate bool EnumProc(IntPtr h, IntPtr l);
+    [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr l);
+    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+    [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h, uint cmd);
+    [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int index);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, System.Text.StringBuilder sb, int max);
+    [DllImport("user32.dll")] static extern void SwitchToThisWindow(IntPtr h, bool altTab);
+    [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int attr, out int v, int size);
+    static IVirtualDesktopManager vdm;
+
+    public static List<KeyValuePair<IntPtr, string>> Windows(int i)
+    {
+        var list = new List<KeyValuePair<IntPtr, string>>();
+        var ids = Ids;
+        if (ids == null || (i + 1) * 16 > ids.Length) return list;
+        var g16 = new byte[16];
+        Array.Copy(ids, i * 16, g16, 0, 16);
+        var want = new Guid(g16);
+        try { if (vdm == null) vdm = (IVirtualDesktopManager)new VirtualDesktopManager(); } catch (Exception) { return list; }
+        var sb = new System.Text.StringBuilder(256);
+        EnumWindows((h, l) =>
+        {
+            if (!IsWindowVisible(h) || GetWindow(h, 4) != IntPtr.Zero || (GetWindowLong(h, -20) & 0x80) != 0) return true; // owned windows and tool windows aren't apps
+            int cloaked;
+            if (DwmGetWindowAttribute(h, 14, out cloaked, 4) == 0 && (cloaked & ~2) != 0) return true; // cloaked by the app itself (suspended); 2 = shell, i.e. another desktop
+            sb.Length = 0;
+            if (GetWindowText(h, sb, sb.Capacity) == 0) return true;
+            Guid d;
+            if (vdm.GetWindowDesktopId(h, out d) == 0 && d == want && list.Count < 12) list.Add(new KeyValuePair<IntPtr, string>(h, sb.ToString()));
+            return true;
+        }, IntPtr.Zero);
+        return list;
+    }
+
+    // Brings a window forward; Windows switches to its desktop on the way, as Alt+Tab does.
+    public static void Show(int i, IntPtr h) { if (i != Current) Go(i); SwitchToThisWindow(h, true); }
 
     // Moves to desktop i the way Windows does it: Ctrl+Win+Left/Right, one step per desktop.
     public static void Go(int i)

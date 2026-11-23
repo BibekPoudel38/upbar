@@ -498,6 +498,30 @@ class Glass : Form
         CloseOnDeactivate = keep;
     }
 
+    // Hover tile: shown under the anchor without taking focus or closing on deactivate; its owner closes it.
+    bool quiet;
+    protected override bool ShowWithoutActivation { get { return quiet; } }
+    public void ShowQuiet(Rectangle anchor)
+    {
+        quiet = true;
+        CloseOnDeactivate = false;
+        if (IsHandleCreated) SetWindowLong(Handle, -20, GetWindowLong(Handle, -20) | 0x08000000); // built early (warmed): CreateParams has run already
+        AnchorRect = anchor;
+        Place(Width, Height);
+        Show();
+    }
+
+    // The hover tile was clicked into: from here it behaves like a popup opened by click (focus, closes on deactivate).
+    [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr h, int index, int v);
+    [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int index);
+    public void Promote()
+    {
+        quiet = false;
+        SetWindowLong(Handle, -20, GetWindowLong(Handle, -20) & ~0x08000000);
+        Activate();
+        CloseOnDeactivate = true; // after Activate: no deactivate from the switch can close it
+    }
+
     public void ShowAt(Rectangle anchor)
     {
         AnchorRect = anchor;
@@ -536,7 +560,7 @@ class Glass : Form
 
     protected override CreateParams CreateParams
     {
-        get { var c = base.CreateParams; if (Tool) c.ExStyle |= 0x80; return c; } // TOOLWINDOW
+        get { var c = base.CreateParams; if (Tool) c.ExStyle |= 0x80; if (quiet) c.ExStyle |= 0x08000000; return c; } // TOOLWINDOW, NOACTIVATE while a hover tile
     }
 
     protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Native.Backdrop(Handle, Material, !Theme.Light, SystemCorners, MaterialTint); Native.ActiveFrame(Handle, NeedsActive); }
@@ -1469,12 +1493,17 @@ class MenuPopup : Glass
 
     // A round icon button at the end of the last added row (e.g. mirror a phone).
     readonly Dictionary<MenuRow, List<IconBtn>> btns = new Dictionary<MenuRow, List<IconBtn>>();
-    public void Button(string icon, string tip, Action a)
+    public void Button(string icon, string tip, Action a) { Button(icon, tip, a, false); }
+    public IconBtn Button(string icon, string tip, Action a, bool keepOpen) // keepOpen: e.g. media controls
     {
         var r = rows[rows.Count - 1];
         if (!btns.ContainsKey(r)) btns[r] = new List<IconBtn>();
-        btns[r].Add(new IconBtn { Icon = icon, Tip = tip, Click = () => { Close(); a(); } });
+        var b = new IconBtn { Icon = icon, Tip = tip, Click = () => { if (!keepOpen) Close(); a(); } };
+        btns[r].Add(b);
+        return b;
     }
+
+    public void Picture(Image img) { rows[rows.Count - 1].Img = img; } // the last row's picture in place of its glyph (album art)
 
     public void ClearRows() { rows.Clear(); btns.Clear(); ClearItems(); }
 
@@ -1520,4 +1549,10 @@ class MenuPopup : Glass
         LayoutMenu();
         ShowAt(new Rectangle(at, new Size(1, 1)));
     }
+}
+
+// A menu card for hover tiles (shown with ShowQuiet).
+class HintTile : MenuPopup
+{
+    public HintTile(float s, string title) : base(s, title) { }
 }

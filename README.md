@@ -5,7 +5,7 @@
 # Upbar
 
 **A fast, zero-dependency desktop top bar, quick settings control center, and widget suite for Windows 10 & 11.**  
-Built with the in-box Windows C# compiler (~430 KB executable, 0 external packages, 240 Hz spring animations).
+Built with the in-box Windows C# compiler (~450 KB executable, 0 external packages, 240 Hz spring animations).
 
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4?style=flat-square&logo=windows)](https://github.com/BibekPoudel38/upbar)
 [![Build](https://img.shields.io/badge/dependencies-zero%20(in--box%20.NET%204)-2ea44f?style=flat-square)](https://github.com/BibekPoudel38/upbar)
@@ -78,6 +78,9 @@ Switch the entire bar, popups, and desktop widgets live between 9 distinct mater
   - Windows Clock app running timers and upcoming alarms
   - Upcoming calendar meetings within 15 minutes with one-click **Join** (`Teams` / `Zoom` / `Meet`)
   - Copied URLs (`Open link`), screen recorder alerts (`OBS` / `ffmpeg`), and low-battery warnings
+- **Hover Tiles:** Hover a pill to drop a tile below it without stealing focus. The **media** pill shows the full now-playing panel (click to keep it open), the **devices** pill lists every device with its battery, each **workspace dot** lists the windows on that desktop (click one to jump to it), and the **activity chip** shows its full text and what a click will do.
+- **Spotlight-Style Search:** One box for apps (classic *and* Microsoft Store apps like Settings, Calculator, and Photos), **Settings pages** (Bluetooth, Display, Night light…), and **files and folders** from the Windows Search index (Desktop, Documents, Downloads, Pictures, Videos, Music, OneDrive), plus inline maths, unit conversions, and web search. File results arrive in ~100 ms on a background thread, so typing never waits.
+- **Full-Screen Aware:** The bar hides itself while a video, game, or browser is full screen on its monitor — even if you're working on another screen — and slides back when you exit.
 - **File Shelf & Clipboard History:** Drag files onto the bar to hold them in the **File Shelf**, or open **Clipboard History** (synced with Windows `Win+V` plus pinned snippets).
 - **Markdown Notes (`Alt+N`):** Fast Markdown notebook with live rendered preview, checklists, code blocks, auto-formatted tables, and image pasting.
 
@@ -129,7 +132,7 @@ upbar/
 │   ├── Audio.cs           # CoreAudio master volume, endpoint switching, and per-app session mixer
 │   ├── Media.cs           # Windows SMTC media session listener & MediaPopup.cs player
 │   ├── Notes.cs           # Split-pane Markdown editor & renderer (Alt+N)
-│   ├── SearchPopup.cs     # Web/AI launcher, inline expression calculator, and unit converter
+│   ├── SearchPopup.cs     # Apps, Store apps, Settings pages, indexed file search, calculator, unit converter, web/AI
 │   ├── Icons.cs           # Squircle shortcut icon generator & hardware Windows cursor themes
 │   ├── Widgets.cs         # 9 visual styles, glass/acrylic/clay renderer, and UI controls
 │   ├── SettingsWindow.cs  # Windows 11-style settings window
