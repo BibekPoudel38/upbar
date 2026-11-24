@@ -3,7 +3,36 @@ using System.IO;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-// Bar preferences, stored as key=value in topbar.ini next to the exe.
+// Where Upbar keeps its files. From GitHub: next to Upbar.exe, as always. From the Microsoft Store the install
+// folder is read-only, so settings, notes and the rest live in %LOCALAPPDATA%/Upbar instead (the manifest turns off
+// write virtualization, so that is the real folder Explorer and Windows see, which squircle icons and cursors need).
+static class App
+{
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    static extern int GetCurrentPackageFullName(ref int length, System.Text.StringBuilder name);
+
+    public static readonly bool Packaged = HasPackage();
+    static bool HasPackage()
+    {
+        try { int n = 0; return GetCurrentPackageFullName(ref n, null) != 15700; } // APPMODEL_ERROR_NO_PACKAGE
+        catch (EntryPointNotFoundException) { return false; } // Windows 7
+    }
+
+    static string data;
+    public static string Data
+    {
+        get
+        {
+            if (data != null) return data;
+            string d = Packaged ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Upbar") : AppDomain.CurrentDomain.BaseDirectory;
+            try { Directory.CreateDirectory(d); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            return data = d;
+        }
+    }
+    public static string File(string name) { return Path.Combine(Data, name); }
+}
+
+// Bar preferences, stored as key=value in topbar.ini (see App.Data).
 class Config
 {
     public int Transparency = 0;                              // 0..100 % see-through
@@ -87,7 +116,7 @@ class Config
         Apply();
     }
 
-    static string FilePath { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "topbar.ini"); } }
+    static string FilePath { get { return App.File("topbar.ini"); } }
 
     public static Config Load()
     {
@@ -183,11 +212,25 @@ class Config
 
     const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run", RunName = "Upbar", OldRunName = "ClaudeTopBar";
 
+    // From the Store, start-up is the package's StartupTask (AppxManifest.xml), switched through WinRT; a Run key
+    // pointing into the package folder wouldn't start it with its identity. From GitHub: the Run key, as before.
+    const string TaskId = "UpbarStartup";
     public static bool StartWithWindows
     {
-        get { using (var k = Registry.CurrentUser.OpenSubKey(RunKey)) return k != null && (k.GetValue(RunName) != null || k.GetValue(OldRunName) != null); }
+        get
+        {
+            if (App.Packaged)
+                try { var st = Sys.Wait(Windows.ApplicationModel.StartupTask.GetAsync(TaskId)).State; return st == Windows.ApplicationModel.StartupTaskState.Enabled || st == Windows.ApplicationModel.StartupTaskState.EnabledByPolicy; }
+                catch (Exception) { return false; }
+            using (var k = Registry.CurrentUser.OpenSubKey(RunKey)) return k != null && (k.GetValue(RunName) != null || k.GetValue(OldRunName) != null); }
         set
         {
+            if (App.Packaged)
+            {
+                try { var t = Sys.Wait(Windows.ApplicationModel.StartupTask.GetAsync(TaskId)); if (value) Sys.Wait(t.RequestEnableAsync()); else t.Disable(); }
+                catch (Exception) { } // turned off by the user in Task Manager › Startup apps: only they can turn it back on there
+                return;
+            }
             using (var k = Registry.CurrentUser.CreateSubKey(RunKey))
             {
                 k.DeleteValue(OldRunName, false); // the entry from before the rename

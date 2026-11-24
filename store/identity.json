@@ -1,0 +1,6 @@
+{
+  "_note": "Copy these from Partner Center > UpBar > Product management > Product identity. They are public (shown in the Store package).",
+  "Name": "UpBar.LocalTest",
+  "Publisher": "CN=UpBarLocalTest",
+  "PublisherDisplayName": "UpBar Local Test"
+}

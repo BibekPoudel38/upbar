@@ -781,7 +781,7 @@ class SystemWidget : DesktopWidget
 class AppsWidget : DesktopWidget
 {
     const int N = 12;
-    static string FilePath { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "apps.txt"); } }
+    static string FilePath { get { return App.File("apps.txt"); } }
     readonly string[] apps = new string[N];
     readonly Bitmap[] icons = new Bitmap[N];
     readonly Bitmap[] sized = new Bitmap[N]; // each icon at its exact on-screen pixel size: still icons are a plain copy, not a resample

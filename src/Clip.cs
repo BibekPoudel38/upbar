@@ -131,7 +131,7 @@ static class Clip
 
     // Pins: text you chose to keep, saved in clippins.txt next to Upbar (one per line, base64 so any text fits)
     // and shown at the top whichever history is in use, Windows' or ours.
-    static string PinFile { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "clippins.txt"); } }
+    static string PinFile { get { return App.File("clippins.txt"); } }
     public static readonly List<string> Pins = LoadPins();
     static List<string> LoadPins()
     {

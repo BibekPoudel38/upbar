@@ -49,7 +49,7 @@ static class Squircles
     [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr h);
 
     // Next to the exe, like fonts\ and topbar.ini: always a real folder Explorer can read (and it travels with the app).
-    static string Dir { get { return Path.Combine(Path.GetDirectoryName(typeof(Squircles).Assembly.Location), "icons"); } }
+    static string Dir { get { return App.File("icons"); } }
     static string BackupFile { get { return Path.Combine(Dir, "backup.txt"); } } // shortcut|original icon path|index, one per line
     public static bool Applied { get { return File.Exists(BackupFile); } }
 
@@ -439,7 +439,7 @@ static class CustomCursors
     public static readonly string[] Names = { "Original", "Dark", "Accent", "Minimal", "Neon" };
     static readonly string[] Roles = { "Arrow", "Hand", "IBeam", "Wait", "AppStarting", "Crosshair", "SizeWE", "SizeNS", "SizeNWSE", "SizeNESW", "SizeAll", "No" };
 
-    static string Dir { get { return Path.Combine(Path.GetDirectoryName(typeof(CustomCursors).Assembly.Location), "cursors"); } }
+    static string Dir { get { return App.File("cursors"); } }
     static string BackupFile { get { return Path.Combine(Dir, "backup.txt"); } }
 
     public static void Apply(int style, Color accent)

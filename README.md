@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="assets/logo.png" width="96" alt="Upbar Logo" />
+<img src="assets/logo.png" width="96" alt="UpBar Logo" />
 
-# Upbar
+# UpBar
 
 **A fast, zero-dependency desktop top bar, quick settings control center, and widget suite for Windows 10 & 11.**  
 Built with the in-box Windows C# compiler (~450 KB executable, 0 external packages, 240 Hz spring animations).
@@ -13,9 +13,9 @@ Built with the in-box Windows C# compiler (~450 KB executable, 0 external packag
 
 </div>
 
-![Upbar Desktop Overview](assets/fullscreen.png)
+![UpBar Desktop Overview](assets/fullscreen.png)
 
-![Upbar Top Bar Close-up](assets/topbar.png)
+![UpBar Top Bar Close-up](assets/topbar.png)
 
 ---
 
@@ -38,7 +38,7 @@ Built with the in-box Windows C# compiler (~450 KB executable, 0 external packag
 
 ![Desktop Widgets Showcase](assets/widgets.png)
 
-Upbar includes **8 snap-to-grid desktop widgets** pinned cleanly behind your windows (`Progman`-owned so `Win+D` / Show Desktop never hides them). Right-click any widget to switch its visual style, grid size (`1×1`, `1×2`, `2×2`, `2×4`, `4×4`), or lock position:
+UpBar includes **8 snap-to-grid desktop widgets** pinned cleanly behind your windows (`Progman`-owned so `Win+D` / Show Desktop never hides them). Right-click any widget to switch its visual style, grid size (`1×1`, `1×2`, `2×2`, `2×4`, `4×4`), or lock position:
 
 1. **Clock** — 8 faces (*Digital*, *Analog*, *Stacked*, *Slim*, *Tall*, *Minimal*, *Spoken Words*, and *Orbit*).
 2. **Weather** — Current conditions and 3-day forecast powered by Open-Meteo (no API key needed) with Fluent 3D weather art.
@@ -106,16 +106,21 @@ Upbar.exe
 | `Upbar.exe --squircles` | Applies tinted squircle icons to Desktop & Start Menu shortcuts. |
 | `Upbar.exe --squircles-undo` | Restores all shortcuts to their original icons. |
 | `Upbar.exe --make-icon upbar.ico` | Regenerates the application `.ico` file from vector art. |
+| `Upbar.exe --make-store-assets <dir>` | Writes the Microsoft Store package logos (all scales) into `<dir>`. |
+
+### Microsoft Store Package
+
+`powershell -ExecutionPolicy Bypass -File store\build-msix.ps1` builds `store\out\UpBar_<version>_neutral.msix` for Partner Center: identity in [`store/identity.json`](store/identity.json), manifest in [`store/AppxManifest.xml`](store/AppxManifest.xml), listing text in [`store/listing.md`](store/listing.md). Add `-Register` to install the unpacked package locally for testing (needs Developer Mode). The Store build keeps its data in `%LOCALAPPDATA%\Upbar`, starts with Windows through the package's startup task, and leaves updates to the Store. Privacy policy: [PRIVACY.md](PRIVACY.md).
 
 ---
 
 ## How "Check for Updates" Works
 
-Upbar includes a built-in self-updater in **Settings → System → Check for updates**:
+UpBar includes a built-in self-updater in **Settings → System → Check for updates**:
 
 1. **Checking:** Queries the GitHub Releases API (`https://api.github.com/repos/BibekPoudel38/upbar/releases/latest`) and compares the latest semantic tag (`vX.Y.Z`) against the running `Updater.Version`.
 2. **Publishing a Release:** Pushing any version tag (`git tag v1.1.0 && git push origin v1.1.0`) triggers the included [GitHub Actions workflow](.github/workflows/release.yml), which compiles `Upbar.exe`, runs `Upbar.exe --selftest`, and attaches `Upbar.exe` + `Upbar-win64.zip` to the GitHub Release.
-3. **One-Click In-Place Upgrade:** When an update is available, clicking the update row downloads the new `Upbar.exe`, renames the currently running binary to `Upbar.exe.old`, swaps the new binary into place, and restarts Upbar automatically (cleaning up `Upbar.exe.old` on startup).
+3. **One-Click In-Place Upgrade:** When an update is available, clicking the update row downloads the new `Upbar.exe`, renames the currently running binary to `Upbar.exe.old`, swaps the new binary into place, and restarts UpBar automatically (cleaning up `Upbar.exe.old` on startup).
 
 ---
 

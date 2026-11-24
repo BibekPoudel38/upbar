@@ -153,7 +153,7 @@ class TopBar : Form
         btns = new List<Btn> { lights, activities, spaces, shelf, clip, notesBtn, media, search, hint, phone, devices, privacy, status, clock }; // visual order within each side
 
         // Tray icon (Windows files it under "Show hidden icons"): brings the bar back after a double-click hid it.
-        tray = new NotifyIcon { Text = "Upbar", Icon = TrayIcon(), Visible = true };
+        tray = new NotifyIcon { Text = "UpBar", Icon = TrayIcon(), Visible = true };
         tray.MouseUp += (s, e) => { if (e.Button == MouseButtons.Left) SetHidden(!hidden); else TrayMenu(); };
         activities.Tip = "Activities (Task view)";
         shelf.Tip = "File shelf: drop files here";
@@ -800,7 +800,7 @@ class TopBar : Form
     {
         if (popup != null) popup.Close();
         var m = new MenuPopup(S, null);
-        m.Item(G.Settings, "Upbar settings", OpenSettings);
+        m.Item(G.Settings, "UpBar settings", OpenSettings);
         m.Item(G.Hidden, "Hide bar", () => SetHidden(true));
         m.Item(G.Close, "Quit top bar", Close);
         m.Open(at);
@@ -1222,7 +1222,7 @@ class TopBar : Form
     // After a restore: read the restored settings and rebuild every widget (the app grid re-reads apps.txt).
     public void Restored()
     {
-        try { Cfg.Parse(File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "topbar.ini"))); } catch (IOException) { }
+        try { Cfg.Parse(File.ReadAllText(App.File("topbar.ini"))); } catch (IOException) { }
         for (int i = 0; i < widgets.Length; i++) { if (widgets[i] != null) { var w = widgets[i]; widgets[i] = null; w.Close(); } widgetSig[i] = null; }
         DbMeter.Alert = Cfg.DbAlert;
         Clip.ReloadPins();
@@ -1559,6 +1559,18 @@ class TopBar : Form
         base.WndProc(ref m);
     }
 
+    // The package logos at 100/150/200/400 % scale (makepri picks per display), plus the unplated taskbar icons.
+    static void StoreAssets(string dir)
+    {
+        Directory.CreateDirectory(dir);
+        var sizes = new[] { new { Name = "Square44x44Logo", Px = 44 }, new { Name = "Square150x150Logo", Px = 150 }, new { Name = "StoreLogo", Px = 50 } };
+        foreach (var a in sizes)
+            foreach (int scale in new[] { 100, 150, 200, 400 })
+                using (var b = Squircles.Monogram(a.Px * scale / 100)) b.Save(Path.Combine(dir, a.Name + ".scale-" + scale + ".png"), System.Drawing.Imaging.ImageFormat.Png);
+        foreach (int t in new[] { 16, 24, 32, 48, 256 })
+            using (var b = Squircles.Monogram(t)) b.Save(Path.Combine(dir, "Square44x44Logo.targetsize-" + t + "_altform-unplated.png"), System.Drawing.Imaging.ImageFormat.Png);
+    }
+
     [STAThread]
     static int Main(string[] args)
     {
@@ -1566,21 +1578,22 @@ class TopBar : Form
         // One-shot icon runs, meant for an elevated prompt so all-users shortcuts are included too.
         if (args.Length > 0 && args[0] == "--squircles") { Squircles.Apply(); return 0; }
         if (args.Length > 0 && args[0] == "--squircles-undo") { Squircles.Undo(); return 0; }
+        if (args.Length > 1 && args[0] == "--make-store-assets") { StoreAssets(args[1]); return 0; } // Microsoft Store package logos
         if (args.Length > 1 && args[0] == "--make-icon") { using (var art = Squircles.Monogram(256)) Squircles.WriteIco(art, args[1]); return 0; } // writes upbar.ico for the build
         if (!Native.EnsureDefaultDesktop(Application.ExecutablePath)) return 0;
         bool fresh;
         using (new System.Threading.Mutex(true, "ClaudeTopBar.Single", out fresh))
         {
             if (!fresh) return 0; // already running: a second app bar would stack under the first
-            Updater.Cleanup();
-            try { if (Config.StartWithWindows) Config.StartWithWindows = true; } catch (Exception) { } // re-point Start with Windows at this exe (it was renamed to Upbar)
+            if (!App.Packaged) Updater.Cleanup();
+            try { if (!App.Packaged && Config.StartWithWindows) Config.StartWithWindows = true; } catch (Exception) { } // re-point Start with Windows at this exe (it was renamed to Upbar)
             Native.SetProcessDPIAware();
             Application.EnableVisualStyles();
             // A shell bar must never stop at a crash dialog: log the error and keep running.
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             Application.ThreadException += (s, e) =>
             {
-                try { File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "topbar.log"), DateTime.Now + "  " + e.Exception + Environment.NewLine); }
+                try { File.AppendAllText(App.File("topbar.log"), DateTime.Now + "  " + e.Exception + Environment.NewLine); }
                 catch (IOException) { }
                 catch (UnauthorizedAccessException) { }
             };

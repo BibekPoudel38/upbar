@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 // images. Restoring only ever writes those known files back next to Upbar, so a tampered zip can't place files elsewhere.
 static class Backup
 {
-    static string Home { get { return AppDomain.CurrentDomain.BaseDirectory; } }
+    static string Home { get { return App.Data; } }
 
     // Entry names a backup may contain (and so the only files a restore will write).
     public static bool IsAllowed(string entry)
@@ -152,6 +152,7 @@ static class Updater
 
     public static void Install(Action onStatus)
     {
+        if (App.Packaged) return; // the Store updates Store installs; swapping the exe would break the package
         if (DownloadUrl == null) { if (ReleaseUrl != null) Shell.Open(ReleaseUrl); return; }
         string url = DownloadUrl;
         DownloadUrl = null;

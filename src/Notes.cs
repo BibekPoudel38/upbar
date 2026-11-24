@@ -13,7 +13,7 @@ using System.Windows.Forms;
 static class NoteStore
 {
     public class Note { public string Path, Title; public DateTime Modified; }
-    public static string Dir { get { return Path.Combine(Path.GetDirectoryName(typeof(NoteStore).Assembly.Location), "notes"); } }
+    public static string Dir { get { return App.File("notes"); } }
     public static string ImageDir { get { return Path.Combine(Dir, "images"); } }
 
     public static List<Note> All()
@@ -450,7 +450,7 @@ class NotesWindow : Form
     public NotesWindow(float s)
     {
         S = s;
-        Text = "Notes · Upbar";
+        Text = "Notes · UpBar";
         Icon = TopBar.AppIcon;
         StartPosition = FormStartPosition.Manual;
         var wa = Screen.PrimaryScreen.WorkingArea;

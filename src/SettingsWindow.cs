@@ -21,7 +21,7 @@ class SettingsWindow : Glass
         CloseOnDeactivate = false;
         ShowInTaskbar = true;
         TopMost = false;
-        Text = "Upbar settings";
+        Text = "UpBar settings";
         Icon = TopBar.AppIcon;
         Tint = 215;
         this.bar = bar;
@@ -115,7 +115,8 @@ class SettingsWindow : Glass
                 Add(new Segmented { Text = "App icons", Options = new[] { "Original", "Squircle" }, Index = Squircles.Applied ? 1 : 0, Tip = "Tinted squircles for shortcuts on your desktop and in your Start menu. Original puts every icon back.", R = Line(52),
                                     Changed = i => { Cursor = Cursors.WaitCursor; if (i == 1) Squircles.Apply(); else Squircles.Undo(); Cursor = Cursors.Default; } });
                 Add(new MenuRow { Icon = G.Restart, Text = "Update squircles for new shortcuts", Compact = true, R = Line(40), Click = () => { Cursor = Cursors.WaitCursor; Squircles.Apply(); Cursor = Cursors.Default; } });
-                Add(new MenuRow { Icon = "\uE895", Text = Updater.Status, Compact = true, R = Line(40), Click = CheckUpdate });
+                if (App.Packaged) Add(new MenuRow { Icon = "\uE895", Text = "Updates come from the Microsoft Store", Compact = true, R = Line(40), Click = () => Shell.Open("ms-windows-store://downloadsandupdates") }); // Store policy: no self-updating
+                else Add(new MenuRow { Icon = "\uE895", Text = Updater.Status, Compact = true, R = Line(40), Click = CheckUpdate });
                 break;
         }
         End();
@@ -131,24 +132,24 @@ class SettingsWindow : Glass
 
     void SaveBackup()
     {
-        using (var d = new SaveFileDialog { Title = "Back up Upbar", Filter = "Upbar backup|*.zip", FileName = "Upbar backup " + DateTime.Now.ToString("yyyy-MM-dd") + ".zip" })
+        using (var d = new SaveFileDialog { Title = "Back up UpBar", Filter = "UpBar backup|*.zip", FileName = "UpBar backup " + DateTime.Now.ToString("yyyy-MM-dd") + ".zip" })
         {
             if (d.ShowDialog(this) != DialogResult.OK) return;
-            try { int n = Backup.Save(d.FileName); MessageBox.Show(this, "Saved " + n + " files to " + d.FileName, "Upbar"); }
-            catch (Exception e) { MessageBox.Show(this, "Couldn't save the backup: " + e.Message, "Upbar"); }
+            try { int n = Backup.Save(d.FileName); MessageBox.Show(this, "Saved " + n + " files to " + d.FileName, "UpBar"); }
+            catch (Exception e) { MessageBox.Show(this, "Couldn't save the backup: " + e.Message, "UpBar"); }
         }
     }
 
     void RestoreBackup()
     {
-        using (var d = new OpenFileDialog { Title = "Restore Upbar", Filter = "Upbar backup|*.zip" })
+        using (var d = new OpenFileDialog { Title = "Restore UpBar", Filter = "UpBar backup|*.zip" })
         {
             if (d.ShowDialog(this) != DialogResult.OK) return;
             int n;
             try { n = Backup.Restore(d.FileName); }
-            catch (Exception e) { MessageBox.Show(this, "Couldn't read that backup: " + e.Message, "Upbar"); return; }
+            catch (Exception e) { MessageBox.Show(this, "Couldn't read that backup: " + e.Message, "UpBar"); return; }
             bar.Restored();
-            MessageBox.Show(this, "Restored " + n + " files. Your previous settings are in topbar.ini.before-restore.", "Upbar");
+            MessageBox.Show(this, "Restored " + n + " files. Your previous settings are in topbar.ini.before-restore.", "UpBar");
             BeginInvoke((Action)bar.ReopenSettings); // this window shows the restored settings
         }
     }

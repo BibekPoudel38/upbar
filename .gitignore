@@ -19,3 +19,6 @@ Upbar.exe.new
 # Scratch preview duplicates (kept in assets/)
 squircle-sample.png
 workspace-dots-preview.png
+
+# Store package build output
+store/out/

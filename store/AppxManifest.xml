@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Template: build-msix.ps1 fills the $TOKENS$ (identity from Partner Center › Product identity, version from src/Backup.cs). -->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap3 desktop desktop6 rescap">
+
+  <Identity Name="$NAME$" Publisher="$PUBLISHER$" Version="$VERSION$" ProcessorArchitecture="neutral" />
+
+  <Properties>
+    <DisplayName>UpBar</DisplayName>
+    <PublisherDisplayName>$PUBLISHERNAME$</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <!-- Squircle icons, cursor themes and the theme/privacy toggles are read by Explorer and Windows itself,
+         so UpBar's files and HKCU settings must be the real ones, not a private per-package copy. -->
+    <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
+    <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="UpBar" Executable="Upbar.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="UpBar"
+        Description="A fast GNOME-style top bar, quick settings and widgets for Windows."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png" />
+      <Extensions>
+        <!-- "Start with Windows" in UpBar's settings switches this on and off (Config.StartWithWindows). -->
+        <desktop:Extension Category="windows.startupTask" Executable="Upbar.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="UpbarStartup" Enabled="false" DisplayName="UpBar" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <Capability Name="internetClient" />
+    <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="unvirtualizedResources" />
+    <uap3:Capability Name="userNotificationListener" />
+    <DeviceCapability Name="bluetooth" />
+    <DeviceCapability Name="radios" />
+    <DeviceCapability Name="wiFiControl" />
+    <DeviceCapability Name="microphone" />
+  </Capabilities>
+</Package>

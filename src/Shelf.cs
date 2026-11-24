@@ -9,7 +9,7 @@ using System.Windows.Forms;
 // File shelf: a saved list of file paths (references, not copies) in shelf.txt next to the exe.
 static class Shelf
 {
-    static string FilePath { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shelf.txt"); } }
+    static string FilePath { get { return App.File("shelf.txt"); } }
     public static readonly List<string> Items = Load();
     public static event Action Changed;
 
