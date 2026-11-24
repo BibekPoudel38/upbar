@@ -67,8 +67,18 @@ static class Updater
 
     public static void Cleanup()
     {
-        try { string old = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Upbar.exe.old"); if (File.Exists(old)) File.Delete(old); }
-        catch (Exception) { }
+        string old = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Upbar.exe.old");
+        if (!File.Exists(old)) return;
+        // Right after an update the old process is still exiting and holds its exe: keep trying for a few seconds.
+        System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+        {
+            for (int i = 0; i < 20 && File.Exists(old); i++)
+            {
+                try { File.Delete(old); }
+                catch (IOException) { System.Threading.Thread.Sleep(500); }
+                catch (UnauthorizedAccessException) { System.Threading.Thread.Sleep(500); } // a running exe reports as access denied
+            }
+        });
     }
 
     public static bool IsNewer(string remoteTag, string currentVersion)
