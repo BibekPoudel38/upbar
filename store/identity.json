@@ -1,6 +1,6 @@
 {
-  "_note": "Copy these from Partner Center > UpBar > Product management > Product identity. They are public (shown in the Store package).",
-  "Name": "UpBar.LocalTest",
-  "Publisher": "CN=UpBarLocalTest",
-  "PublisherDisplayName": "UpBar Local Test"
+  "_note": "From Partner Center > UpBar > Product management > Product identity. These values are public (shown in the Store package).",
+  "Name": "BibekPoudel.UpBar",
+  "Publisher": "CN=2DE4F248-D13B-42E3-BF16-5510B0E6DDD0",
+  "PublisherDisplayName": "BibekPoudel"
 }
