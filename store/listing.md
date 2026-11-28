@@ -74,7 +74,13 @@ UpBar is a desktop shell enhancement (a top app bar registered with SHAppBarMess
 
 Restricted capabilities:
 - runFullTrust: UpBar is a Win32 desktop app (app bar window, WinForms UI).
-- unvirtualizedResources: Features the user turns on explicitly change real per-user Windows state that Explorer and Windows must see. These are Settings › System › App icons (writes .ico files and points the user's Start menu/desktop shortcuts at them, with a backup and one-click restore), cursor themes (HKCU\Control Panel\Cursors plus .cur files, restorable), dark mode and the camera/location privacy toggles (HKCU), and "Start with Windows" fallbacks. With write virtualization on, Windows would never see these changes. UpBar's own data lives in %LOCALAPPDATA%\Upbar.
+- unvirtualizedResources (denied on the first submission; resubmitted with this expanded detail): UpBar is a quick-settings panel, and several controls exist only to change the user's own Windows settings when clicked. With write virtualization these writes land in a private per-package copy that Windows never reads (tested: HKCU and Start menu writes were redirected and had no effect).
+  - Dark theme tile: HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize.
+  - Camera and location tiles: HKCU\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore.
+  - Cursor themes: HKCU\Control Panel\Cursors plus .cur files; the original scheme is backed up and restored in one click.
+  - Squircle app icons (off by default): .ico files and the user's desktop/Start menu shortcuts; originals backed up and restorable.
+  - Nothing goes to HKLM or system folders, nothing runs elevated, nothing changes until the user acts. Own data: %LOCALAPPDATA%\Upbar.
+  - Website: https://github.com/BibekPoudel38/upbar · Support: https://github.com/BibekPoudel38/upbar/issues
 - userNotificationListener: shows the user's notifications in UpBar's notification panel after the user grants Notification access. Nothing is stored or transmitted.
 
 Other notes:
