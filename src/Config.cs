@@ -48,6 +48,7 @@ class Config
         set { Accent = value.IsEmpty ? "" : string.Format("#{0:X2}{1:X2}{2:X2}", value.R, value.G, value.B); }
     }
     public bool Fahrenheit, LockWidgets, ClearBar, VolumeOsd, SmartHints = true, MatchApp = true, ShowNotes = true, ShowDevices = true, WinControls; // traffic lights: off unless switched on
+    public int OsdStyle, BrightStyle, OsdPos;                 // volume / brightness pop-up: style 0 ring, 1 bar, 2 vertical; OsdPos: VolumeOsd.Positions
     public int PhoneScale = 1;                                // phone desktop mode: 0 smaller, 1 like Windows, 2 larger
     public int DbAlert = 85;                                  // sound level meter: dB that counts as loud                      // desktop widgets
     public string City = "";                                  // weather location, sent to Open-Meteo's search
@@ -166,6 +167,9 @@ class Config
                 case "showDevices": if (isBool) ShowDevices = b; break;
                 case "winControls": if (isBool) WinControls = b; break;
                 case "dbAlert": if (isInt) DbAlert = Clamp(n, 40, 120); break;
+                case "osdStyle": if (isInt) OsdStyle = Clamp(n, 0, 2); break;
+                case "brightStyle": if (isInt) BrightStyle = Clamp(n, 0, 2); break;
+                case "osdPos": if (isInt) OsdPos = Clamp(n, 0, 3); break;
                 case "phoneScale": if (isInt) PhoneScale = Clamp(n, 0, 2); break;
                 case "cursor": if (isInt) CursorStyle = Clamp(n, 0, 4); break;
                 case "fahrenheit": if (isBool) Fahrenheit = b; break;
@@ -188,9 +192,9 @@ class Config
     {
         var sb = new System.Text.StringBuilder();
         foreach (var kv in widgets) sb.Append("widget.").Append(kv.Key).Append('=').Append(kv.Value).Append('\n');
-        return string.Format("transparency={0}\nheight={1}\nactivities={2}\nstatus={3}\nclock={4}\nclock24={5}\nshowDate={6}\nshowPercent={7}\nshowMedia={8}\nmediaAnim={9}\nhiddenTiles={10}\nblur={11}\nshowShelf={12}\nshowClipboard={13}\nfloating={14}\nshowSearch={15}\nsearchEngine={16}\nsearchUrl={17}\nglass={18}\ntileSizes={19}\nfont={20}\naccent={21}\nfahrenheit={22}\ncity={23}\nlockWidgets={24}\nclearBar={25}\nvolumeOsd={26}\nsmartHints={27}\nmatchApp={28}\nshowNotes={29}\ndbAlert={30}\nwinControls={31}\nphoneScale={32}\nshowDevices={33}\ncursor={34}\n",
+        return string.Format("transparency={0}\nheight={1}\nactivities={2}\nstatus={3}\nclock={4}\nclock24={5}\nshowDate={6}\nshowPercent={7}\nshowMedia={8}\nmediaAnim={9}\nhiddenTiles={10}\nblur={11}\nshowShelf={12}\nshowClipboard={13}\nfloating={14}\nshowSearch={15}\nsearchEngine={16}\nsearchUrl={17}\nglass={18}\ntileSizes={19}\nfont={20}\naccent={21}\nfahrenheit={22}\ncity={23}\nlockWidgets={24}\nclearBar={25}\nvolumeOsd={26}\nsmartHints={27}\nmatchApp={28}\nshowNotes={29}\ndbAlert={30}\nwinControls={31}\nphoneScale={32}\nshowDevices={33}\ncursor={34}\nosdStyle={35}\nbrightStyle={36}\nosdPos={37}\n",
             Transparency, Height, ActivitiesPos, StatusPos, ClockPos, Clock24, ShowDate, ShowPercent, ShowMedia, MediaAnim, HiddenTiles, Blur, ShowShelf, ShowClipboard, Floating, ShowSearch, SearchEngine, SearchUrl, GlassStyle, TileSizes, Font, Accent,
-            Fahrenheit, City, LockWidgets, ClearBar, VolumeOsd, SmartHints, MatchApp, ShowNotes, DbAlert, WinControls, PhoneScale, ShowDevices, CursorStyle) + sb;
+            Fahrenheit, City, LockWidgets, ClearBar, VolumeOsd, SmartHints, MatchApp, ShowNotes, DbAlert, WinControls, PhoneScale, ShowDevices, CursorStyle, OsdStyle, BrightStyle, OsdPos) + sb;
     }
 
     // One line in an ini file: no control characters, bounded length.

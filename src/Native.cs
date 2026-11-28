@@ -391,9 +391,17 @@ static class Native
 
     public static float Luma(Color c) { return (0.2126f * c.R + 0.7152f * c.G + 0.0722f * c.B) / 255f; }
 
-    public static GraphicsPath Round(RectangleF r, float rad) { return Round(r, rad, rad, rad, rad); }
+    // Each visual style's roundness for everything inside a window (buttons, pills, sliders, tiles), by Glass.StyleNames
+    // index: Material You and Clay go rounder, Paper and Brutalist squarer. Pills stay pills: a radius is capped at half the shape.
+    public static readonly float[] StyleRound = { 1f, 1.6f, 1f, 1.25f, 1f, 0.5f, 1.5f, 0.25f, 1.1f };
+    public static float RoundK { get { return Glass.Style >= 0 && Glass.Style < StyleRound.Length ? StyleRound[Glass.Style] : 1; } }
 
-    public static GraphicsPath Round(RectangleF r, float tl, float tr, float br, float bl)
+    public static GraphicsPath Round(RectangleF r, float rad) { return Round(r, rad, rad, rad, rad); }
+    public static GraphicsPath Round(RectangleF r, float tl, float tr, float br, float bl) { float k = RoundK; return RoundExact(r, tl * k, tr * k, br * k, bl * k); }
+
+    // Exact radius: window outlines, whose corner already follows the style (Glass.CornerFor) and must match the window's region.
+    public static GraphicsPath RoundExact(RectangleF r, float rad) { return RoundExact(r, rad, rad, rad, rad); }
+    public static GraphicsPath RoundExact(RectangleF r, float tl, float tr, float br, float bl)
     {
         var p = new GraphicsPath();
         if (tl <= 0 && tr <= 0 && br <= 0 && bl <= 0) { p.AddRectangle(r); return p; } // square: tiny arcs would nick a pixel off each corner

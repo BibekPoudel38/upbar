@@ -107,6 +107,9 @@ class SettingsWindow : Glass
             default:
                 AddToggle("Show battery percentage", c.ShowPercent, v => { c.ShowPercent = v; c.Apply(); });
                 AddToggle("Replace Windows' volume and brightness pop-up", c.VolumeOsd, v => { c.VolumeOsd = v; c.Apply(); });
+                Add(new Segmented { Text = "Volume pop-up", Options = VolumeOsd.Styles, Index = c.OsdStyle, R = Line(52), Changed = i => { c.OsdStyle = i; c.Apply(); } });
+                Add(new Segmented { Text = "Brightness pop-up", Options = VolumeOsd.Styles, Index = c.BrightStyle, R = Line(52), Changed = i => { c.BrightStyle = i; c.Apply(); } });
+                Add(new Segmented { Text = "Pop-up position", Options = VolumeOsd.Positions, Index = c.OsdPos, R = Line(52), Changed = i => { c.OsdPos = i; c.Apply(); } });
                 AddToggle("Smart suggestions in the bar", c.SmartHints, v => { c.SmartHints = v; c.Apply(); });
                 Add(new Segmented { Text = "Phone desktop mode size", Options = new[] { "Smaller", "Like Windows", "Larger" }, Index = c.PhoneScale, Tip = "How big things look on your phone's desktop. Applies the next time you open it.", R = Line(52), Changed = i => { c.PhoneScale = i; c.Apply(); } });
                 Add(new MenuRow { Icon = "", Text = "Back up settings, app grid and notes…", Compact = true, R = Line(40), Click = SaveBackup });

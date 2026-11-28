@@ -311,9 +311,9 @@ class Glass : Form
     {
         var card = CardRect(full, style, s);
         if (style == 7) // hard offset shadow: ink in light mode, the accent in dark mode
-            using (var sp = Native.Round(new RectangleF(full.X + 5 * s, full.Y + 5 * s, card.Width, card.Height), radius))
+            using (var sp = Native.RoundExact(new RectangleF(full.X + 5 * s, full.Y + 5 * s, card.Width, card.Height), radius))
                 Native.Fill(g, sp, light ? Color.FromArgb(14, 14, 14) : accent);
-        using (var p = Native.Round(card, radius))
+        using (var p = Native.RoundExact(card, radius))
         {
             Native.Fill(g, p, Color.FromArgb(style == 2 || style == 4 ? 0 : 255, bas));
             switch (style)
@@ -363,7 +363,7 @@ class Glass : Form
     {
         var c = CardRect(full, style, s);
         var edge = new RectangleF(c.X + 0.5f, c.Y + 0.5f, c.Width - 1.5f, c.Height - 1.5f);
-        using (var p = Native.Round(edge, radius))
+        using (var p = Native.RoundExact(edge, radius))
             switch (style)
             {
                 case 4: // glass edge: bright where the light hits (top-left), fading round the far side
@@ -372,13 +372,13 @@ class Glass : Form
                     break;
                 case 3: // neumorphism: lit rim top-left, shaded rim bottom-right
                     var inset = new RectangleF(edge.X + s, edge.Y + s, edge.Width - 2 * s, edge.Height - 2 * s);
-                    using (var ip = Native.Round(inset, Math.Max(1, radius - s)))
+                    using (var ip = Native.RoundExact(inset, Math.Max(1, radius - s)))
                     using (var rim = new LinearGradientBrush(inset, Color.FromArgb(light ? 230 : 40, 255, 255, 255), Color.FromArgb(light ? 50 : 150, 0, 0, 0), LinearGradientMode.ForwardDiagonal))
                     using (var pen = new Pen(rim, 2 * s)) g.DrawPath(pen, ip);
                     break;
                 case 6: // clay: a thick soft rim, brighter on top
                     var ci = new RectangleF(edge.X + 1.5f * s, edge.Y + 1.5f * s, edge.Width - 3 * s, edge.Height - 3 * s);
-                    using (var cp = Native.Round(ci, Math.Max(1, radius - 1.5f * s)))
+                    using (var cp = Native.RoundExact(ci, Math.Max(1, radius - 1.5f * s)))
                     using (var rim = new LinearGradientBrush(new RectangleF(ci.X, ci.Y - 1, ci.Width, ci.Height + 2), Color.FromArgb(light ? 150 : 50, 255, 255, 255), Color.FromArgb(light ? 10 : 4, 255, 255, 255), LinearGradientMode.Vertical))
                     using (var pen = new Pen(rim, 3 * s)) g.DrawPath(pen, cp);
                     break;
@@ -448,7 +448,7 @@ class Glass : Form
     }
 
     public float Radius { get { return (SystemCorners ? 8 : CornerFor(Style, Corner)) * S; } }
-    public static float CornerFor(int style, float corner) { return style == 1 || style == 3 ? corner + 4 : style == 4 || style == 8 ? corner : style == 6 ? corner + 10 : style == 7 ? Math.Min(corner, 8) : style == 5 ? Math.Min(corner, 10) : Math.Min(corner, 14); }
+    public static float CornerFor(int style, float corner) { return style == 1 ? corner + 10 : style == 3 ? corner + 4 : style == 4 || style == 8 ? corner : style == 6 ? corner + 10 : style == 7 ? Math.Min(corner, 8) : style == 5 ? Math.Min(corner, 10) : Math.Min(corner, 14); }
     protected RectangleF ScrollArea; // widgets with Scrolls = true move inside this area
     float scroll, scrollTarget, scrollVel, scrollMax;
     protected Rectangle AnchorRect;
@@ -602,7 +602,7 @@ class Glass : Form
                 {
                     bgg.Clear(Color.Transparent);
                     bgg.SmoothingMode = SmoothingMode.AntiAlias;
-                    using (var p = Native.Round(full, Radius)) PaintMaterial(bgg, p);
+                    using (var p = Native.RoundExact(full, Radius)) PaintMaterial(bgg, p);
                     PaintCard(bgg, full, Radius, Style, Theme.Light, Theme.Base, Theme.Accent, S);
                 }
             }
@@ -1426,7 +1426,7 @@ class StyleGrid : Widget
         Theme.Palette(style, light, Theme.Accent, out fore, out bas, out surface);
         float rad = Glass.CornerFor(style, 24) * S * 0.45f;
         var st = g.Save();
-        using (var clip = Native.Round(r, rad + 2 * S)) g.SetClip(clip, CombineMode.Intersect);
+        using (var clip = Native.RoundExact(r, rad + 2 * S)) g.SetClip(clip, CombineMode.Intersect);
         if (style == 2 || style == 4) // a blurry stand-in wallpaper so the material reads
         {
             using (var wp = new LinearGradientBrush(r, Color.FromArgb(32, 110, 120), Color.FromArgb(70, 40, 110), LinearGradientMode.ForwardDiagonal)) g.FillRectangle(wp, r);

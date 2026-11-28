@@ -219,7 +219,7 @@ class TopBar : Form
             Hooks(Cfg.Floating || Cfg.ClearBar || Cfg.MatchApp || Cfg.WinControls);
             ApplyShape();
             SyncWidgets();
-            VolumeKeys.Enable(Cfg.VolumeOsd, S, this);
+            VolumeKeys.VolStyle = Cfg.OsdStyle; VolumeKeys.BrightStyle = Cfg.BrightStyle; VolumeKeys.Pos = Cfg.OsdPos; VolumeKeys.Enable(Cfg.VolumeOsd, S, this);
         };
         Audio.Reset();
         if (Cfg.ShowMedia) Media.Start();
@@ -909,7 +909,7 @@ class TopBar : Form
             var body = new RectangleF(0, 0, Width, Height);
             float rad = FloatNow ? 8 * S : 0; // acrylic only takes DWM's own rounded corners
             g.SmoothingMode = rad > 0 ? SmoothingMode.AntiAlias : SmoothingMode.None; // square bar: smoothing would leave its edge rows half see-through (a faint line)
-            using (var p = Native.Round(body, rad))
+            using (var p = Native.RoundExact(body, rad))
             {
                 var barColor = Glass.Style == 1 ? Theme.Mix(Color.FromArgb(18, 17, 22), Theme.Accent, 0.12f) : Glass.Style == 0 ? Color.FromArgb(24, 24, 27) : Color.FromArgb(16, 16, 18);
                 if (!appColor.IsEmpty) Native.Fill(g, p, appColor); // matching the maximized app
@@ -920,7 +920,7 @@ class TopBar : Form
                     using (var scrim = new LinearGradientBrush(body, Color.FromArgb(70, shade), Color.FromArgb(0, shade), 90f)) g.FillPath(scrim, p); // keeps the text readable
                 }
                 else Native.Fill(g, p, Color.FromArgb(Glass.Translucent ? (int)(40 + 200 * (100 - Cfg.Transparency) / 100f) : 255, barColor)); // tint over real blur, or solid
-                if (FloatNow) { var edge = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f); using (var pe = Native.Round(edge, rad)) Native.Gloss(g, pe, edge, S, 0.6f); }
+                if (FloatNow) { var edge = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f); using (var pe = Native.RoundExact(edge, rad)) Native.Gloss(g, pe, edge, S, 0.6f); }
             }
             g.SmoothingMode = SmoothingMode.AntiAlias;
             if (spotA > 0.01f && spotW > 2) // liquid sliding hover capsule
@@ -1514,7 +1514,7 @@ class TopBar : Form
         meetingPoll = new System.Threading.Timer(_ => { var m = Meetings.Next(); try { BeginInvoke((Action)(() => { meeting = m; RefreshStatus(); })); } catch (InvalidOperationException) { } }, null, 3000, 60000);
         clockPoll = new System.Threading.Timer(_ => { var l = ClockApp.Upcoming(); try { BeginInvoke((Action)(() => { clockItems = l; RefreshStatus(); })); } catch (InvalidOperationException) { } }, null, 0, 15000);
         VolumeKeys.SuppressBrightOsd = () => popup is ControlCenter;
-        Sys.WatchNotes(); SyncWidgets(); VolumeKeys.Enable(Cfg.VolumeOsd, S, this); Native.Trim();
+        Sys.WatchNotes(); SyncWidgets(); VolumeKeys.VolStyle = Cfg.OsdStyle; VolumeKeys.BrightStyle = Cfg.BrightStyle; VolumeKeys.Pos = Cfg.OsdPos; VolumeKeys.Enable(Cfg.VolumeOsd, S, this); Native.Trim();
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
@@ -1667,6 +1667,9 @@ static class SelfTest
         if (!(TopBar.LowBattery(50, false, false).IsEmpty && TopBar.LowBattery(15, true, false).IsEmpty && !TopBar.LowBattery(25, false, false).IsEmpty && TopBar.LowBattery(30, false, false).IsEmpty && TopBar.LowBattery(25, false, false).G > 120
               && TopBar.LowBattery(8, false, false).R == 255 && TopBar.LowBattery(8, false, false).G < 120)) fails++; // low battery colours
         if (!(Math.Abs(VolumeKeys.Step(0.5f, 0xAF) - 0.52f) < 0.001f && VolumeKeys.Step(1f, 0xAF) == 1 && VolumeKeys.Step(0.01f, 0xAE) == 0 && Math.Abs(VolumeKeys.Step(0.33f, 0xAE) - 0.32f) < 0.001f)) fails++; // volume steps
+        { var oc = new Config(); oc.Parse("osdStyle=9\nbrightStyle=1\nosdPos=3"); var rc = new Config(); rc.Parse(oc.Serialize()); if (rc.OsdStyle != 2 || rc.BrightStyle != 1 || rc.OsdPos != 3) fails++; } // pop-up styles and position: clamped and saved
+        if (Native.StyleRound.Length != Glass.StyleNames.Length) fails++; // a roundness for every style
+        if (VolumeOsd.Spot(new Rectangle(0, 0, 1000, 800), new Size(100, 200), 3, 1) != new Point(876, 300) || VolumeOsd.Spot(new Rectangle(0, 0, 1000, 800), new Size(100, 200), 0, 1) != new Point(450, 552)) fails++; // pop-up placement
         if (!(TopBar.Suggest(25, false, false, false, false) == "charge" && TopBar.Suggest(25, true, false, false, false) == null && TopBar.Suggest(80, false, true, true, true) == "muted"
               && TopBar.Suggest(80, false, true, false, true) == "offline" && TopBar.Suggest(100, true, false, false, false) == "full" && TopBar.Suggest(-1, false, false, false, false) == null)) fails++; // suggestions
         if (!(TopBar.WebLink(" https://example.com/a?b=1 ") == "https://example.com/a?b=1" && TopBar.WebLink("file:///C:/x.exe") == null && TopBar.WebLink("calc.exe") == null

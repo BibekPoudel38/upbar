@@ -35,6 +35,7 @@ static class VolumeKeys
     static Control uiHost;
     static VolumeOsd osd;
     static float scale;
+    public static int VolStyle, BrightStyle, Pos; // VolumeOsd.Styles / Positions index, from the config
     public static Func<bool> SuppressBrightOsd; // true while the Control Center's own brightness slider is open
 
     // Called on the UI thread, which runs the hook.
@@ -69,7 +70,9 @@ static class VolumeKeys
     static void OnWinEvent(IntPtr hk, uint ev, IntPtr hwnd, int obj, int child, uint th, uint time)
     {
         if (obj != 0 || child != 0 || hwnd == IntPtr.Zero) return;
-        if (cloaked.Contains(hwnd)) { Cloak(hwnd); return; }
+        // Re-cloak only if Explorer moved it back: Cloak's own SetWindowRgn fires two LOCATIONCHANGEs, so re-cloaking
+        // unconditionally fed back exponentially and starved the UI thread (frozen OSD, frozen app).
+        if (cloaked.Contains(hwnd)) { Native.RECT r; if (GetWindowRect(hwnd, out r) && r.l > -30000) Cloak(hwnd); return; }
         if (unchecked(activeUntil - Environment.TickCount) <= 0) return;
         if (IsNativeOsd(hwnd)) Cloak(hwnd);
     }
@@ -202,76 +205,5 @@ static class VolumeKeys
         else { o.Volume = Step(o.Volume, vk); if (o.Muted) o.Muted = false; } // like Windows: changing the level unmutes
         if (osd == null || osd.IsDisposed) osd = new VolumeOsd(scale);
         osd.Pop(o.Volume, o.Muted, false);
-    }
-}
-
-class VolumeOsd : Glass
-{
-    static readonly Font BigIcon = new Font("Segoe Fluent Icons", 24f);
-    float level, shown = -1;
-    bool muted, bright;
-    readonly Timer hide = new Timer { Interval = 1500 };
-
-    public VolumeOsd(float s) : base(s)
-    {
-        CloseOnDeactivate = false;
-        Size = new Size((int)(148 * S), (int)(148 * S));
-        Corner = 28;
-        Add(new View());
-        hide.Tick += (a, b) => { hide.Stop(); Vanish(Hide); };
-        FormClosed += (a, b) => hide.Dispose();
-    }
-
-    protected override bool ShowWithoutActivation { get { return true; } }
-    protected override CreateParams CreateParams { get { var p = base.CreateParams; p.ExStyle |= 0x08000000; return p; } } // NOACTIVATE
-
-    public void Pop(float v, bool mute, bool isBrightness)
-    {
-        bool wasVisible = Visible;
-        level = v;
-        muted = mute;
-        if (!wasVisible || bright != isBrightness || shown < 0) shown = v;
-        bright = isBrightness;
-        var screen = Screen.PrimaryScreen.WorkingArea; // bottom centre of the primary screen
-        int x = screen.Left + (screen.Width - Width) / 2;
-        int y = screen.Bottom - Height - (int)(48 * S);
-        Location = new Point(x, y);
-        if (!wasVisible) Show(); // the first Show plays the opening by itself
-        else Appear();           // already up, or fading away: come back
-        Kick();
-        Invalidate();
-        hide.Stop();
-        hide.Start();
-    }
-
-    class View : Widget
-    {
-        public override bool Interactive { get { return false; } }
-        public override bool Animate()
-        {
-            var o = (VolumeOsd)Owner;
-            float s = o.shown;
-            bool b = Native.Ease(ref s, !o.bright && o.muted ? 0 : o.level, 0.32f);
-            o.shown = s;
-            return b;
-        }
-        public override void Paint(Graphics g)
-        {
-            var o = (VolumeOsd)Owner;
-            float s = S, w = o.Width, cx = w / 2f, cy = 62 * s, r = 38 * s, stroke = 7 * s;
-            float val = !o.bright && o.muted ? 0 : (o.shown < 0 ? o.level : o.shown);
-            using (var bgPen = new Pen(Theme.A(38), stroke))
-                g.DrawEllipse(bgPen, cx - r, cy - r, 2 * r, 2 * r);
-            if (val > 0.005f)
-            {
-                float sweep = Math.Max(4f, 360f * Math.Min(1f, val));
-                using (var fgPen = new Pen(Theme.Accent, stroke) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round })
-                    g.DrawArc(fgPen, cx - r, cy - r, 2 * r, 2 * r, -90f, sweep);
-            }
-            string icon = o.bright ? G.Brightness : o.muted ? G.Mute : G.Volume(o.level, false);
-            g.DrawString(icon, BigIcon, !o.bright && o.muted ? Theme.Dim : Theme.Text, new RectangleF(cx - r, cy - r, 2 * r, 2 * r), Theme.Center);
-            string label = !o.bright && o.muted ? "Muted" : Math.Round(o.level * 100) + "%";
-            g.DrawString(label, Theme.Bold, !o.bright && o.muted ? Theme.Dim : Theme.Text, new RectangleF(0, 112 * s, w, 24 * s), Theme.Center);
-        }
     }
 }
